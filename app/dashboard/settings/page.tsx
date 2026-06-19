@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
         {/* Right Content */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8">
             
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-2">Store Profile</h2>

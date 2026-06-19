@@ -101,7 +101,7 @@ export default function NewBillPage() {
         
         {/* Left Column: Customer & Payment Info */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3 mb-4">Customer Details</h2>
             
             <div className="space-y-4">
@@ -164,7 +164,7 @@ export default function NewBillPage() {
 
         {/* Right Column: Products & Calculation */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Products</h2>
               <button 

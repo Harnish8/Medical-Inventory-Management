@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import { SidebarProvider } from "@/components/SidebarProvider";
 
 export default async function DashboardLayout({
   children,
@@ -16,18 +17,20 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden print:bg-white print:h-auto print:overflow-visible">
-      <div className="print:hidden h-full">
-        <Sidebar />
-      </div>
-      <div className="flex-1 flex flex-col min-w-0 print:block">
-        <div className="print:hidden">
-          <Header />
+    <SidebarProvider>
+      <div className="flex h-screen bg-gray-50 overflow-hidden print:bg-white print:h-auto print:overflow-visible">
+        <div className="print:hidden h-full">
+          <Sidebar />
         </div>
-        <main className="flex-1 overflow-y-auto p-6 relative print:p-0 print:overflow-visible">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col min-w-0 print:block w-full">
+          <div className="print:hidden">
+            <Header />
+          </div>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 relative print:p-0 print:overflow-visible">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

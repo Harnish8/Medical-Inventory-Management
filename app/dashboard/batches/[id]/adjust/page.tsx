@@ -78,7 +78,7 @@ export default function AdjustBatchPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8">
         
         {batchInfo && (
           <div className="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">

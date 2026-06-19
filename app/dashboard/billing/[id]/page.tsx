@@ -33,7 +33,7 @@ export default async function ViewBillPage({ params }: { params: { id: string } 
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 print:shadow-none print:border-none print:p-0">
         {/* Invoice Header */}
-        <div className="flex justify-between items-start border-b border-gray-100 pb-8 print:pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start border-b border-gray-100 pb-8 print:pb-4 gap-6 sm:gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-sm print:bg-black">
@@ -46,7 +46,7 @@ export default async function ViewBillPage({ params }: { params: { id: string } 
             <p className="text-sm text-gray-500">GSTIN: 22AAAAA0000A1Z5</p>
           </div>
           
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <h1 className="text-3xl font-bold text-gray-200 uppercase tracking-widest print:text-black">Invoice</h1>
             <p className="font-medium text-gray-900 mt-2">{bill.billId}</p>
             <p className="text-sm text-gray-500">Date: {new Date(bill.createdAt).toLocaleDateString()}</p>
@@ -65,8 +65,8 @@ export default async function ViewBillPage({ params }: { params: { id: string } 
         </div>
 
         {/* Items Table */}
-        <div className="py-6 print:py-4">
-          <table className="w-full text-left">
+        <div className="py-6 print:py-4 overflow-x-auto">
+          <table className="w-full text-left min-w-[500px]">
             <thead>
               <tr className="border-b-2 border-gray-100 text-gray-600 text-sm print:border-black">
                 <th className="py-3 font-medium">Description</th>

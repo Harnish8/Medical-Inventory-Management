@@ -64,7 +64,7 @@ export default function AddDealerPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4 md:col-span-2">
             <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-2">Business Details</h2>
