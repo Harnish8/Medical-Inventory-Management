@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { Package, Layers, AlertTriangle, XCircle, TrendingUp, DollarSign } from "lucide-react";
 import dbConnect from "@/lib/mongodb";
 import { Product } from "@/models/Product";
