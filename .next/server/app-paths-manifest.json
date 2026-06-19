@@ -1,9 +1,0 @@
-{
-  "/dashboard/batches/[id]/page": "app/dashboard/batches/[id]/page.js",
-  "/dashboard/dealers/page": "app/dashboard/dealers/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/inventory/page": "app/dashboard/inventory/page.js",
-  "/dashboard/reports/page": "app/dashboard/reports/page.js",
-  "/dashboard/alerts/page": "app/dashboard/alerts/page.js",
-  "/dashboard/settings/page": "app/dashboard/settings/page.js"
-}
