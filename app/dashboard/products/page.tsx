@@ -76,7 +76,13 @@ export default async function ProductsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{product.productName}</p>
-                      <p className="text-xs text-gray-500">{product.unitType}</p>
+                      {product.genericName && (
+                        <p className="text-xs text-gray-500 font-medium">{product.genericName}</p>
+                      )}
+                      {product.manufacturer && (
+                        <p className="text-xs text-gray-400 mt-0.5">by {product.manufacturer}</p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Unit: {product.unitType}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {product.categoryId?.categoryName || 'Unknown'}

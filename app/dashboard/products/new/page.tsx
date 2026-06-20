@@ -12,6 +12,7 @@ export default function AddProductPage() {
   
   const [formData, setFormData] = useState({
     productName: "",
+    genericName: "",
     categoryId: "",
     hsnCode: "",
     gstPercentage: "12",
@@ -77,7 +78,7 @@ export default function AddProductPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name (Brand) *</label>
             <input
               type="text"
               name="productName"
@@ -85,7 +86,19 @@ export default function AddProductPage() {
               value={formData.productName}
               onChange={handleChange}
               className="block w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
-              placeholder="e.g. Aspirin 500mg"
+              placeholder="e.g. Crocin 500mg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Generic Name / Composition</label>
+            <input
+              type="text"
+              name="genericName"
+              value={formData.genericName}
+              onChange={handleChange}
+              className="block w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
+              placeholder="e.g. Paracetamol"
             />
           </div>
 
@@ -105,14 +118,14 @@ export default function AddProductPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer / Company</label>
             <input
               type="text"
               name="manufacturer"
               value={formData.manufacturer}
               onChange={handleChange}
               className="block w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
-              placeholder="e.g. Cipla"
+              placeholder="e.g. GSK, Micro Labs"
             />
           </div>
 

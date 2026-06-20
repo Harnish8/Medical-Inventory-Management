@@ -37,6 +37,11 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
     const dealers = await Dealer.find({ status: "Active" }).sort({ createdAt: -1 });
     return NextResponse.json(dealers, { status: 200 });

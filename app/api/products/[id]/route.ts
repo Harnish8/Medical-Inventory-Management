@@ -7,6 +7,11 @@ import { ProductCategory } from "@/models/ProductCategory";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
     const product = await Product.findById(params.id).populate({
       path: 'categoryId',

@@ -43,6 +43,11 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await dbConnect();
     const products = await Product.find({ status: "Active" });
     return NextResponse.json(products, { status: 200 });
