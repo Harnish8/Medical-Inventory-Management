@@ -1,25 +1,41 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Plus, Search, Building2 } from "lucide-react";
 import Link from "next/link";
-import dbConnect from "@/lib/mongodb";
-import { Dealer } from "@/models/Dealer";
 
-export default async function DealersPage() {
-  await dbConnect();
-  
-  // Fetch dealers
-  const dealers = await Dealer.find({ status: "Active" })
-    .sort({ createdAt: -1 })
-    .lean();
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <td key={i} className="px-6 py-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+export default function DealersPage() {
+  const [dealers, setDealers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dealers")
+      .then((r) => r.json())
+      .then((data) => { setDealers(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dealers & Suppliers</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Dealers &amp; Suppliers</h1>
           <p className="text-gray-500 text-sm">Manage your suppliers, contact info, and GST details.</p>
         </div>
-        <Link 
-          href="/dashboard/dealers/new" 
+        <Link
+          href="/dashboard/dealers/new"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
         >
           <Plus size={20} />
@@ -47,13 +63,17 @@ export default async function DealersPage() {
               <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-sm">
                 <th className="px-6 py-4 font-medium">Dealer Name</th>
                 <th className="px-6 py-4 font-medium">Contact Person</th>
-                <th className="px-6 py-4 font-medium">Phone & Email</th>
+                <th className="px-6 py-4 font-medium">Phone &amp; Email</th>
                 <th className="px-6 py-4 font-medium">GSTIN</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {dealers.length === 0 ? (
+              {loading ? (
+                <>
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+                </>
+              ) : dealers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
@@ -64,8 +84,8 @@ export default async function DealersPage() {
                       <p className="text-gray-500 mb-6 max-w-sm">
                         Get started by adding your first supplier to the directory.
                       </p>
-                      <Link 
-                        href="/dashboard/dealers/new" 
+                      <Link
+                        href="/dashboard/dealers/new"
                         className="px-6 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
                       >
                         Add Dealer
@@ -84,9 +104,7 @@ export default async function DealersPage() {
                         <span className="font-medium text-gray-900">{dealer.dealerName}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {dealer.contactPerson}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{dealer.contactPerson}</td>
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-gray-900">{dealer.phone}</p>
                       <p className="text-xs text-gray-500">{dealer.email}</p>

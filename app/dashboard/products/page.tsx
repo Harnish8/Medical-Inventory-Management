@@ -1,17 +1,31 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Plus, Search, Filter } from "lucide-react";
 import Link from "next/link";
-import dbConnect from "@/lib/mongodb";
-import { Product } from "@/models/Product";
-import { ProductCategory } from "@/models/ProductCategory";
 
-export default async function ProductsPage() {
-  await dbConnect();
-  
-  // Fetch products and populate category
-  const products = await Product.find({}).populate({
-    path: 'categoryId',
-    model: ProductCategory
-  }).lean();
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-6 py-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+export default function ProductsPage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data) => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -20,8 +34,8 @@ export default async function ProductsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Product Catalog</h1>
           <p className="text-gray-500 text-sm">Manage your inventory products and minimum stock levels.</p>
         </div>
-        <Link 
-          href="/dashboard/products/new" 
+        <Link
+          href="/dashboard/products/new"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
         >
           <Plus size={20} />
@@ -60,10 +74,14 @@ export default async function ProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {products.length === 0 ? (
+              {loading ? (
+                <>
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+                </>
+              ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No products found. Click "Add Product" to create one.
+                    No products found. Click &quot;Add Product&quot; to create one.
                   </td>
                 </tr>
               ) : (
@@ -85,14 +103,14 @@ export default async function ProductsPage() {
                       <p className="text-xs text-gray-500 mt-1">Unit: {product.unitType}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {product.categoryId?.categoryName || 'Unknown'}
+                      {product.categoryId?.categoryName || "Unknown"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {product.minStockLevel} units
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        product.status === "Active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
                       }`}>
                         {product.status}
                       </span>

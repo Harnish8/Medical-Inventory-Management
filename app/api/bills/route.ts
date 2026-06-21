@@ -2,10 +2,38 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
+import { withCache } from "@/lib/cache";
 import { CustomerBill } from "@/models/CustomerBill";
 import { Batch } from "@/models/Batch";
 import { Product } from "@/models/Product";
 import { InventoryMovement } from "@/models/InventoryMovement";
+
+const fetchBills = withCache(
+  "bills",
+  () =>
+    CustomerBill.aggregate([
+      { $sort: { createdAt: -1 } },
+      { $limit: 50 },
+      { $addFields: { itemCount: { $size: { $ifNull: ["$items", []] } } } },
+      { $project: { items: 0 } },
+    ]),
+  30
+);
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const bills = await fetchBills();
+    const response = NextResponse.json(bills, { status: 200 });
+    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    return response;
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {

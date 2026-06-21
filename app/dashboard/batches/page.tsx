@@ -1,21 +1,31 @@
-export const revalidate = 30; // revalidate every 30 seconds
+"use client";
 
+import { useState, useEffect } from "react";
 import { Plus, Search, Filter } from "lucide-react";
 import Link from "next/link";
-import dbConnect from "@/lib/mongodb";
-import { Batch } from "@/models/Batch";
-import { Product } from "@/models/Product";
-import { Dealer } from "@/models/Dealer";
 
-export default async function BatchesPage() {
-  await dbConnect();
-  
-  // Fetch batches with pagination cap — populate product/dealer for display
-  const batches = await Batch.find({})
-    .populate([{ path: 'productId', model: Product }, { path: 'dealerId', model: Dealer }])
-    .sort({ expiryDate: 1 })
-    .limit(100) // cap at 100; add pagination UI if needed
-    .lean();
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {[...Array(7)].map((_, i) => (
+        <td key={i} className="px-6 py-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+export default function BatchesPage() {
+  const [batches, setBatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/batches")
+      .then((r) => r.json())
+      .then((data) => { setBatches(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -24,8 +34,8 @@ export default async function BatchesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Batch Inventory</h1>
           <p className="text-gray-500 text-sm">Manage stock at the batch level to track expiry dates and FIFO.</p>
         </div>
-        <Link 
-          href="/dashboard/batches/new" 
+        <Link
+          href="/dashboard/batches/new"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
         >
           <Plus size={20} />
@@ -65,10 +75,14 @@ export default async function BatchesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {batches.length === 0 ? (
+              {loading ? (
+                <>
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+                </>
+              ) : batches.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No batches found. Click "Receive Stock" to add a batch.
+                    No batches found. Click &quot;Receive Stock&quot; to add a batch.
                   </td>
                 </tr>
               ) : (
@@ -76,10 +90,10 @@ export default async function BatchesPage() {
                   const expiryDate = new Date(batch.expiryDate);
                   const isExpired = expiryDate < new Date();
                   const isExpiringSoon = !isExpired && (expiryDate.getTime() - new Date().getTime()) < 30 * 24 * 60 * 60 * 1000;
-                  
+
                   let statusBadge = "bg-green-100 text-green-800";
-                  if (batch.status === 'SoldOut') statusBadge = "bg-gray-100 text-gray-800";
-                  else if (isExpired || batch.status === 'Expired') statusBadge = "bg-red-100 text-red-800";
+                  if (batch.status === "SoldOut") statusBadge = "bg-gray-100 text-gray-800";
+                  else if (isExpired || batch.status === "Expired") statusBadge = "bg-red-100 text-red-800";
                   else if (isExpiringSoon) statusBadge = "bg-orange-100 text-orange-800";
 
                   return (
@@ -93,10 +107,10 @@ export default async function BatchesPage() {
                         <p className="font-medium text-gray-900">{batch.productId?.productName}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {batch.dealerId?.dealerName || 'Unknown'}
+                        {batch.dealerId?.dealerName || "Unknown"}
                       </td>
                       <td className="px-6 py-4">
-                        <p className={`text-sm font-medium ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-orange-600' : 'text-gray-900'}`}>
+                        <p className={`text-sm font-medium ${isExpired ? "text-red-600" : isExpiringSoon ? "text-orange-600" : "text-gray-900"}`}>
                           {expiryDate.toLocaleDateString()}
                         </p>
                       </td>
@@ -105,7 +119,7 @@ export default async function BatchesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge}`}>
-                          {batch.status === 'SoldOut' ? 'Sold Out' : isExpired ? 'Expired' : isExpiringSoon ? 'Expiring Soon' : 'Active'}
+                          {batch.status === "SoldOut" ? "Sold Out" : isExpired ? "Expired" : isExpiringSoon ? "Expiring Soon" : "Active"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -113,7 +127,7 @@ export default async function BatchesPage() {
                         <Link href={`/dashboard/batches/${batch._id.toString()}/adjust`} className="text-gray-500 hover:text-gray-700 text-sm font-medium">Adjust</Link>
                       </td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>

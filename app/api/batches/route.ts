@@ -2,10 +2,38 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
+import { withCache } from "@/lib/cache";
 import { Batch } from "@/models/Batch";
 import { Product } from "@/models/Product";
 import { Dealer } from "@/models/Dealer";
 import { InventoryMovement } from "@/models/InventoryMovement";
+
+const fetchBatches = withCache(
+  "batches",
+  () =>
+    Batch.find({})
+      .populate([{ path: "productId", model: Product }, { path: "dealerId", model: Dealer }])
+      .sort({ expiryDate: 1 })
+      .limit(100)
+      .lean(),
+  30
+);
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const batches = await fetchBatches();
+    const response = NextResponse.json(batches, { status: 200 });
+    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    return response;
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {

@@ -1,70 +1,30 @@
-export const revalidate = 30; // revalidate every 30 seconds
+"use client";
 
+import { useState, useEffect } from "react";
 import { Search, AlertTriangle, PackageSearch } from "lucide-react";
-import dbConnect from "@/lib/mongodb";
-import { Product } from "@/models/Product";
-import { Batch } from "@/models/Batch";
 
-export default async function InventoryPage() {
-  await dbConnect();
-  
-  // Single MongoDB aggregation pipeline — joins products + batches on the DB side
-  // Much faster than fetching both collections and joining in JS
-  const inventoryData: any[] = await Product.aggregate([
-    { $match: { status: "Active" } },
-    {
-      $lookup: {
-        from: "batches",
-        let: { productId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$productId", "$$productId"] },
-              status: "Active",
-              quantityCurrent: { $gt: 0 },
-            },
-          },
-          { $sort: { expiryDate: 1 } },
-          { $project: { quantityCurrent: 1, costPricePerUnit: 1, expiryDate: 1 } },
-        ],
-        as: "batches",
-      },
-    },
-    {
-      $addFields: {
-        totalStock: { $sum: "$batches.quantityCurrent" },
-        totalValue: {
-          $sum: {
-            $map: {
-              input: "$batches",
-              as: "b",
-              in: { $multiply: ["$$b.quantityCurrent", "$$b.costPricePerUnit"] },
-            },
-          },
-        },
-        batchCount: { $size: "$batches" },
-        nextExpiry: { $arrayElemAt: ["$batches.expiryDate", 0] }, // already sorted asc
-      },
-    },
-    {
-      $addFields: {
-        stockStatus: {
-          $cond: {
-            if: { $eq: ["$totalStock", 0] },
-            then: "Out of Stock",
-            else: {
-              $cond: {
-                if: { $lte: ["$totalStock", "$minStockLevel"] },
-                then: "Low Stock",
-                else: "In Stock",
-              },
-            },
-          },
-        },
-      },
-    },
-    { $project: { batches: 0 } }, // drop the batches array from the result
-  ]);
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-6 py-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+export default function InventoryPage() {
+  const [inventoryData, setInventoryData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/inventory")
+      .then((r) => r.json())
+      .then((data) => { setInventoryData(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -102,7 +62,11 @@ export default async function InventoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {inventoryData.length === 0 ? (
+              {loading ? (
+                <>
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+                </>
+              ) : inventoryData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
@@ -143,14 +107,12 @@ export default async function InventoryPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-900">
-                      ₹{item.totalValue.toLocaleString('en-IN')}
+                      ₹{item.totalValue.toLocaleString("en-IN")}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {item.nextExpiry ? new Date(item.nextExpiry).toLocaleDateString() : "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {item.batchCount} batches
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{item.batchCount} batches</td>
                   </tr>
                 ))
               )}

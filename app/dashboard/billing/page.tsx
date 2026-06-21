@@ -1,30 +1,41 @@
-export const revalidate = 30; // revalidate every 30 seconds
+"use client";
 
+import { useState, useEffect } from "react";
 import { Plus, Search, FileText } from "lucide-react";
 import Link from "next/link";
-import dbConnect from "@/lib/mongodb";
-import { CustomerBill } from "@/models/CustomerBill";
 
-export default async function BillingPage() {
-  await dbConnect();
-  
-  // Fetch bills — exclude the heavy embedded `items` array (not needed for list view)
-  // and cap at 50 most recent records
-  const bills = await CustomerBill.find({})
-    .select("-items") // items array can be huge; fetch only on detail view
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .lean();
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse">
+      {[...Array(6)].map((_, i) => (
+        <td key={i} className="px-6 py-4">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+export default function BillingPage() {
+  const [bills, setBills] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/bills")
+      .then((r) => r.json())
+      .then((data) => { setBills(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing & Invoices</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Billing &amp; Invoices</h1>
           <p className="text-gray-500 text-sm">Generate customer bills and view transaction history.</p>
         </div>
-        <Link 
-          href="/dashboard/billing/new" 
+        <Link
+          href="/dashboard/billing/new"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
         >
           <Plus size={20} />
@@ -59,7 +70,11 @@ export default async function BillingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {bills.length === 0 ? (
+              {loading ? (
+                <>
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+                </>
+              ) : bills.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
@@ -70,8 +85,8 @@ export default async function BillingPage() {
                       <p className="text-gray-500 mb-6 max-w-sm">
                         Start making sales by generating your first customer bill.
                       </p>
-                      <Link 
-                        href="/dashboard/billing/new" 
+                      <Link
+                        href="/dashboard/billing/new"
                         className="px-6 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
                       >
                         Generate Bill
@@ -95,10 +110,10 @@ export default async function BillingPage() {
                       <p className="text-xs text-gray-500">{bill.customerType}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {bill.items?.length || 0} items
+                      {bill.itemCount ?? 0} items
                     </td>
                     <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">₹{bill.totalAmount.toLocaleString('en-IN')}</p>
+                      <p className="font-medium text-gray-900">₹{bill.totalAmount.toLocaleString("en-IN")}</p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link href={`/dashboard/billing/${bill._id.toString()}`} className="text-primary hover:text-blue-800 text-sm font-medium mr-3">View</Link>
