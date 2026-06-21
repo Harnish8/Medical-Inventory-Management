@@ -35,8 +35,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid username or password");
         }
         
-        // Update last login
-        await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+        // Update last login in the background without awaiting it to speed up login
+        User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).exec().catch(console.error);
         
         return {
           id: user._id.toString(),

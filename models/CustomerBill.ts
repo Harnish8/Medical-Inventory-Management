@@ -57,5 +57,7 @@ const CustomerBillSchema: Schema = new Schema(
 );
 
 CustomerBillSchema.index({ createdAt: -1 });
+CustomerBillSchema.index({ createdAt: -1, totalAmount: 1 }); // covered query for dashboard sales agg
+CustomerBillSchema.index({ customerName: 1 });               // for future search
 
 export const CustomerBill: Model<ICustomerBill> = mongoose.models.CustomerBill || mongoose.model<ICustomerBill>('CustomerBill', CustomerBillSchema);

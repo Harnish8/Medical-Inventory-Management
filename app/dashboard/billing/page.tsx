@@ -1,3 +1,5 @@
+export const revalidate = 30; // revalidate every 30 seconds
+
 import { Plus, Search, FileText } from "lucide-react";
 import Link from "next/link";
 import dbConnect from "@/lib/mongodb";
@@ -6,9 +8,12 @@ import { CustomerBill } from "@/models/CustomerBill";
 export default async function BillingPage() {
   await dbConnect();
   
-  // Fetch bills
+  // Fetch bills — exclude the heavy embedded `items` array (not needed for list view)
+  // and cap at 50 most recent records
   const bills = await CustomerBill.find({})
+    .select("-items") // items array can be huge; fetch only on detail view
     .sort({ createdAt: -1 })
+    .limit(50)
     .lean();
 
   return (

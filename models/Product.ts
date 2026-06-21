@@ -34,5 +34,6 @@ const ProductSchema: Schema = new Schema(
 );
 
 ProductSchema.index({ status: 1 });
+ProductSchema.index({ status: 1, productName: 1 }); // for filtered + sorted product queries
 
 export const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);

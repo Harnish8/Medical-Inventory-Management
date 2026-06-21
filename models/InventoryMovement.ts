@@ -27,4 +27,7 @@ const InventoryMovementSchema: Schema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+InventoryMovementSchema.index({ createdAt: -1 });
+InventoryMovementSchema.index({ productId: 1, createdAt: -1 });
+
 export const InventoryMovement: Model<IInventoryMovement> = mongoose.models.InventoryMovement || mongoose.model<IInventoryMovement>('InventoryMovement', InventoryMovementSchema);

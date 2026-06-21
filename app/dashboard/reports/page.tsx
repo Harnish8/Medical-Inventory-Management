@@ -1,3 +1,5 @@
+export const revalidate = 300; // reports are fine being 5 minutes stale
+
 import { TrendingUp, BarChart3, ArrowUpRight, ArrowDownRight, IndianRupee } from "lucide-react";
 import dbConnect from "@/lib/mongodb";
 import { CustomerBill } from "@/models/CustomerBill";
@@ -14,15 +16,22 @@ export default async function ReportsPage() {
   const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  // Single aggregation for monthly stats
-  const monthlySales = await CustomerBill.aggregate([
-    { $match: { createdAt: { $gte: firstDayLastMonth } } },
-    { $group: {
-      _id: { $gte: ["$createdAt", firstDayThisMonth] }, // true = this month, false = last month
-      total: { $sum: "$totalAmount" },
-      tax: { $sum: "$taxAmount" },
-      count: { $sum: 1 }
-    }}
+  // Parallelize all report queries
+  const [monthlySales, recentMovements] = await Promise.all([
+    CustomerBill.aggregate([
+      { $match: { createdAt: { $gte: firstDayLastMonth } } },
+      { $group: {
+        _id: { $gte: ["$createdAt", firstDayThisMonth] }, // true = this month, false = last month
+        total: { $sum: "$totalAmount" },
+        tax: { $sum: "$taxAmount" },
+        count: { $sum: 1 }
+      }}
+    ]),
+    InventoryMovement.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate({ path: 'productId', model: Product })
+      .lean()
   ]);
 
   const thisMonth = monthlySales.find(m => m._id === true) || { total: 0, count: 0 };
@@ -34,13 +43,6 @@ export default async function ReportsPage() {
   const estimatedProfit = (lastMonth.total - lastMonth.tax) * 0.20;
 
   const salesGrowth = lastMonthSales === 0 ? 100 : ((thisMonthSales - lastMonthSales) / lastMonthSales) * 100;
-
-  // Fetch recent movements
-  const recentMovements = await InventoryMovement.find()
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .populate({ path: 'productId', model: Product })
-    .lean();
 
   return (
     <div className="space-y-6">

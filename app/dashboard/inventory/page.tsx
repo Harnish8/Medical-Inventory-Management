@@ -1,3 +1,5 @@
+export const revalidate = 30; // revalidate every 30 seconds
+
 import { Search, AlertTriangle, PackageSearch } from "lucide-react";
 import dbConnect from "@/lib/mongodb";
 import { Product } from "@/models/Product";
@@ -6,36 +8,63 @@ import { Batch } from "@/models/Batch";
 export default async function InventoryPage() {
   await dbConnect();
   
-  // Fetch all products
-  const products = await Product.find({ status: "Active" }).lean();
-  
-  // Fetch all active batches
-  const batches = await Batch.find({ status: "Active", quantityCurrent: { $gt: 0 } }).lean();
-
-  // Aggregate stock per product
-  const inventoryData = products.map((product: any) => {
-    const productBatches = batches.filter(
-      (b: any) => b.productId.toString() === product._id.toString()
-    );
-
-    const totalStock = productBatches.reduce((sum: number, b: any) => sum + b.quantityCurrent, 0);
-    const totalValue = productBatches.reduce((sum: number, b: any) => sum + (b.quantityCurrent * b.costPricePerUnit), 0);
-    
-    // Sort batches by expiry to find the next expiring one
-    const sortedBatches = [...productBatches].sort(
-      (a: any, b: any) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
-    );
-    const nextExpiry = sortedBatches.length > 0 ? sortedBatches[0].expiryDate : null;
-
-    return {
-      ...product,
-      totalStock,
-      totalValue,
-      batchCount: productBatches.length,
-      nextExpiry,
-      stockStatus: totalStock === 0 ? "Out of Stock" : totalStock <= product.minStockLevel ? "Low Stock" : "In Stock"
-    };
-  });
+  // Single MongoDB aggregation pipeline — joins products + batches on the DB side
+  // Much faster than fetching both collections and joining in JS
+  const inventoryData: any[] = await Product.aggregate([
+    { $match: { status: "Active" } },
+    {
+      $lookup: {
+        from: "batches",
+        let: { productId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$productId", "$$productId"] },
+              status: "Active",
+              quantityCurrent: { $gt: 0 },
+            },
+          },
+          { $sort: { expiryDate: 1 } },
+          { $project: { quantityCurrent: 1, costPricePerUnit: 1, expiryDate: 1 } },
+        ],
+        as: "batches",
+      },
+    },
+    {
+      $addFields: {
+        totalStock: { $sum: "$batches.quantityCurrent" },
+        totalValue: {
+          $sum: {
+            $map: {
+              input: "$batches",
+              as: "b",
+              in: { $multiply: ["$$b.quantityCurrent", "$$b.costPricePerUnit"] },
+            },
+          },
+        },
+        batchCount: { $size: "$batches" },
+        nextExpiry: { $arrayElemAt: ["$batches.expiryDate", 0] }, // already sorted asc
+      },
+    },
+    {
+      $addFields: {
+        stockStatus: {
+          $cond: {
+            if: { $eq: ["$totalStock", 0] },
+            then: "Out of Stock",
+            else: {
+              $cond: {
+                if: { $lte: ["$totalStock", "$minStockLevel"] },
+                then: "Low Stock",
+                else: "In Stock",
+              },
+            },
+          },
+        },
+      },
+    },
+    { $project: { batches: 0 } }, // drop the batches array from the result
+  ]);
 
   return (
     <div className="space-y-6">

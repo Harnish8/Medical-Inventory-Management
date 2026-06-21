@@ -1,3 +1,5 @@
+export const revalidate = 60; // cache dashboard page for 60 seconds
+
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { Package, Layers, AlertTriangle, XCircle, TrendingUp, DollarSign } from "lucide-react";
@@ -12,24 +14,56 @@ export default async function DashboardPage() {
   // Connect to DB and fetch real metrics
   await dbConnect();
   
-  const totalProducts = await Product.countDocuments({ status: "Active" });
-  const totalBatches = await Batch.countDocuments({ status: "Active" });
+  // Fetch all dashboard data in parallel for massive speedup
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   
-  // Aggregate inventory value
-  const valueAgg = await Batch.aggregate([
-    { $match: { status: "Active" } },
-    { $group: { _id: null, total: { $sum: { $multiply: ["$costPricePerUnit", "$quantityCurrent"] } } } }
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const [
+    totalProducts,
+    totalBatches,
+    valueAgg,
+    products,
+    stockAgg,
+    expiringBatches,
+    expiredBatches,
+    salesAgg
+  ] = await Promise.all([
+    Product.countDocuments({ status: "Active" }),
+    Batch.countDocuments({ status: "Active" }),
+    Batch.aggregate([
+      { $match: { status: "Active" } },
+      { $group: { _id: null, total: { $sum: { $multiply: ["$costPricePerUnit", "$quantityCurrent"] } } } }
+    ]),
+    Product.find({ status: "Active" }, { _id: 1, minStockLevel: 1 }).lean(),
+    Batch.aggregate([
+      { $match: { status: "Active" } },
+      { $group: { _id: "$productId", totalStock: { $sum: "$quantityCurrent" } } }
+    ]),
+    Batch.countDocuments({
+      status: "Active",
+      quantityCurrent: { $gt: 0 },
+      expiryDate: { $lte: thirtyDaysFromNow }
+    }),
+    Batch.countDocuments({
+      status: "Active",
+      quantityCurrent: { $gt: 0 },
+      expiryDate: { $lte: new Date() }
+    }),
+    CustomerBill.aggregate([
+      { $match: { createdAt: { $gte: startOfDay, $lte: endOfDay } } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+    ])
   ]);
+
   const totalValue = valueAgg[0]?.total ?? 0;
   
-  // Find low stock products
-  const products = await Product.find({ status: "Active" }).lean();
-  
   // Single aggregation query instead of N queries
-  const stockAgg = await Batch.aggregate([
-    { $match: { status: "Active" } },
-    { $group: { _id: "$productId", totalStock: { $sum: "$quantityCurrent" } } }
-  ]);
   const stockMap = Object.fromEntries(stockAgg.map(s => [s._id.toString(), s.totalStock]));
   
   let lowStockCount = 0;
@@ -39,34 +73,7 @@ export default async function DashboardPage() {
     if (stock === 0) outOfStockCount++;
     else if (stock <= product.minStockLevel) lowStockCount++;
   }
-
-  // Calculate expiring soon (next 30 days)
-  const thirtyDaysFromNow = new Date();
-  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   
-  const expiringBatches = await Batch.countDocuments({
-    status: "Active",
-    quantityCurrent: { $gt: 0 },
-    expiryDate: { $lte: thirtyDaysFromNow }
-  });
-  
-  const expiredBatches = await Batch.countDocuments({
-    status: "Active",
-    quantityCurrent: { $gt: 0 },
-    expiryDate: { $lte: new Date() }
-  });
-
-  // Calculate Today's Sales
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const salesAgg = await CustomerBill.aggregate([
-    { $match: { createdAt: { $gte: startOfDay, $lte: endOfDay } } },
-    { $group: { _id: null, total: { $sum: "$totalAmount" } } }
-  ]);
   const todaysSalesValue = salesAgg[0]?.total ?? 0;
 
   return (

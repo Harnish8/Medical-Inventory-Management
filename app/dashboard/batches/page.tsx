@@ -1,3 +1,5 @@
+export const revalidate = 30; // revalidate every 30 seconds
+
 import { Plus, Search, Filter } from "lucide-react";
 import Link from "next/link";
 import dbConnect from "@/lib/mongodb";
@@ -8,11 +10,12 @@ import { Dealer } from "@/models/Dealer";
 export default async function BatchesPage() {
   await dbConnect();
   
-  // Fetch batches and populate product and dealer
-  const batches = await Batch.find({}).populate([
-    { path: 'productId', model: Product },
-    { path: 'dealerId', model: Dealer }
-  ]).sort({ expiryDate: 1 }).lean();
+  // Fetch batches with pagination cap — populate product/dealer for display
+  const batches = await Batch.find({})
+    .populate([{ path: 'productId', model: Product }, { path: 'dealerId', model: Dealer }])
+    .sort({ expiryDate: 1 })
+    .limit(100) // cap at 100; add pagination UI if needed
+    .lean();
 
   return (
     <div className="space-y-6">
