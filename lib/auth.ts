@@ -36,8 +36,7 @@ export const authOptions: NextAuthOptions = {
         }
         
         // Update last login
-        user.lastLogin = new Date();
-        await user.save();
+        await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
         
         return {
           id: user._id.toString(),
@@ -72,7 +71,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 15 * 60, // 15 minutes session timeout as per PRD
+    maxAge: 8 * 60 * 60, // 8 hours — full workday session
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

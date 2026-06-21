@@ -33,4 +33,6 @@ const ProductSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+ProductSchema.index({ status: 1 });
+
 export const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);

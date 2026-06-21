@@ -4,6 +4,7 @@ import { Package, Layers, AlertTriangle, XCircle, TrendingUp, DollarSign } from 
 import dbConnect from "@/lib/mongodb";
 import { Product } from "@/models/Product";
 import { Batch } from "@/models/Batch";
+import { CustomerBill } from "@/models/CustomerBill";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -15,20 +16,28 @@ export default async function DashboardPage() {
   const totalBatches = await Batch.countDocuments({ status: "Active" });
   
   // Aggregate inventory value
-  const batches = await Batch.find({ status: "Active" });
-  const totalValue = batches.reduce((acc, batch) => acc + (batch.costPricePerUnit * batch.quantityCurrent), 0);
+  const valueAgg = await Batch.aggregate([
+    { $match: { status: "Active" } },
+    { $group: { _id: null, total: { $sum: { $multiply: ["$costPricePerUnit", "$quantityCurrent"] } } } }
+  ]);
+  const totalValue = valueAgg[0]?.total ?? 0;
   
   // Find low stock products
-  const products = await Product.find({ status: "Active" });
+  const products = await Product.find({ status: "Active" }).lean();
+  
+  // Single aggregation query instead of N queries
+  const stockAgg = await Batch.aggregate([
+    { $match: { status: "Active" } },
+    { $group: { _id: "$productId", totalStock: { $sum: "$quantityCurrent" } } }
+  ]);
+  const stockMap = Object.fromEntries(stockAgg.map(s => [s._id.toString(), s.totalStock]));
+  
   let lowStockCount = 0;
   let outOfStockCount = 0;
-  
   for (const product of products) {
-    const productBatches = await Batch.find({ productId: product._id, status: "Active" });
-    const currentStock = productBatches.reduce((acc, b) => acc + b.quantityCurrent, 0);
-    
-    if (currentStock === 0) outOfStockCount++;
-    else if (currentStock <= product.minStockLevel) lowStockCount++;
+    const stock = stockMap[product._id.toString()] ?? 0;
+    if (stock === 0) outOfStockCount++;
+    else if (stock <= product.minStockLevel) lowStockCount++;
   }
 
   // Calculate expiring soon (next 30 days)
@@ -54,12 +63,11 @@ export default async function DashboardPage() {
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999);
 
-  const { CustomerBill } = await import("@/models/CustomerBill");
-  const todaysBills = await CustomerBill.find({
-    createdAt: { $gte: startOfDay, $lte: endOfDay }
-  });
-  
-  const todaysSalesValue = todaysBills.reduce((acc, bill) => acc + bill.totalAmount, 0);
+  const salesAgg = await CustomerBill.aggregate([
+    { $match: { createdAt: { $gte: startOfDay, $lte: endOfDay } } },
+    { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+  ]);
+  const todaysSalesValue = salesAgg[0]?.total ?? 0;
 
   return (
     <div className="space-y-6">

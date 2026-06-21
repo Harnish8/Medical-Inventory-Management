@@ -56,4 +56,6 @@ const CustomerBillSchema: Schema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+CustomerBillSchema.index({ createdAt: -1 });
+
 export const CustomerBill: Model<ICustomerBill> = mongoose.models.CustomerBill || mongoose.model<ICustomerBill>('CustomerBill', CustomerBillSchema);

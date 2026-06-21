@@ -43,4 +43,8 @@ const BatchSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+BatchSchema.index({ status: 1 });
+BatchSchema.index({ productId: 1, status: 1 });
+BatchSchema.index({ expiryDate: 1, status: 1 });
+
 export const Batch: Model<IBatch> = mongoose.models.Batch || mongoose.model<IBatch>('Batch', BatchSchema);

@@ -14,25 +14,26 @@ export default async function ReportsPage() {
   const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  const thisMonthBills = await CustomerBill.find({
-    createdAt: { $gte: firstDayThisMonth }
-  }).lean();
-  
-  const lastMonthBills = await CustomerBill.find({
-    createdAt: { $gte: firstDayLastMonth, $lte: lastDayLastMonth }
-  }).lean();
+  // Single aggregation for monthly stats
+  const monthlySales = await CustomerBill.aggregate([
+    { $match: { createdAt: { $gte: firstDayLastMonth } } },
+    { $group: {
+      _id: { $gte: ["$createdAt", firstDayThisMonth] }, // true = this month, false = last month
+      total: { $sum: "$totalAmount" },
+      tax: { $sum: "$taxAmount" },
+      count: { $sum: 1 }
+    }}
+  ]);
 
-  const thisMonthSales = thisMonthBills.reduce((acc, bill) => acc + bill.totalAmount, 0);
-  const lastMonthSales = lastMonthBills.reduce((acc, bill) => acc + bill.totalAmount, 0);
-  
+  const thisMonth = monthlySales.find(m => m._id === true) || { total: 0, count: 0 };
+  const lastMonth = monthlySales.find(m => m._id === false) || { total: 0, tax: 0 };
+
+  const thisMonthSales = thisMonth.total;
+  const thisMonthBillCount = thisMonth.count;
+  const lastMonthSales = lastMonth.total;
+  const estimatedProfit = (lastMonth.total - lastMonth.tax) * 0.20;
+
   const salesGrowth = lastMonthSales === 0 ? 100 : ((thisMonthSales - lastMonthSales) / lastMonthSales) * 100;
-
-  // Calculate Total Profit (Selling Price - Cost Price for all sold batches)
-  // For MVP, we will estimate profit based on recent bills
-  const recentBills = await CustomerBill.find().sort({ createdAt: -1 }).limit(100).lean();
-  const totalRecentSales = recentBills.reduce((acc, bill) => acc + bill.totalAmount, 0);
-  const totalRecentTax = recentBills.reduce((acc, bill) => acc + bill.taxAmount, 0);
-  const estimatedProfit = (totalRecentSales - totalRecentTax) * 0.20; // Rough 20% estimate for report
 
   // Fetch recent movements
   const recentMovements = await InventoryMovement.find()
@@ -81,7 +82,7 @@ export default async function ReportsPage() {
             <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
               <IndianRupee size={20} />
             </div>
-            <h2 className="font-semibold text-gray-900">Est. Profit (Last 100 Bills)</h2>
+            <h2 className="font-semibold text-gray-900">Est. Profit (Last Month)</h2>
           </div>
           <p className="text-3xl font-bold text-gray-900 mb-2">₹{estimatedProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
           <p className="text-xs text-gray-500 mt-2">Calculated after deducting GST</p>
@@ -95,7 +96,7 @@ export default async function ReportsPage() {
             </div>
             <h2 className="font-semibold text-gray-900">Total Invoices (Month)</h2>
           </div>
-          <p className="text-3xl font-bold text-gray-900 mb-2">{thisMonthBills.length}</p>
+          <p className="text-3xl font-bold text-gray-900 mb-2">{thisMonthBillCount}</p>
           <p className="text-xs text-gray-500 mt-2">Unique transactions generated</p>
         </div>
 
