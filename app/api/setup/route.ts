@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ message: "Admin already exists. Setup skipped." }, { status: 200 });
     }
 
-    const hashedPassword = await bcrypt.hash("admin123", 12);
+    const hashedPassword = await bcrypt.hash("admin123", 10);
     
     const newAdmin = new User({
       username: "admin",
