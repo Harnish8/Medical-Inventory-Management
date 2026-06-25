@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Search, Building2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Search, Building2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 function SkeletonRow() {
@@ -19,13 +19,47 @@ function SkeletonRow() {
 export default function DealersPage() {
   const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetch("/api/dealers")
-      .then((r) => r.json())
-      .then((data) => { setDealers(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetchDealers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/dealers");
+      const data = await res.json();
+      setDealers(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchDealers(); }, [fetchDealers]);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete dealer "${name}"? They will be marked inactive.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/dealers/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDealers((prev) => prev.filter((d) => d._id.toString() !== id));
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete: ${err.error}`);
+      }
+    } catch {
+      alert("Error deleting dealer");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const filtered = dealers.filter((d) =>
+    d.dealerName?.toLowerCase().includes(search.toLowerCase()) ||
+    d.contactPerson?.toLowerCase().includes(search.toLowerCase()) ||
+    d.gstin?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -44,14 +78,16 @@ export default function DealersPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-100">
+          <div className="relative max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={18} className="text-gray-400" />
             </div>
             <input
               type="text"
               placeholder="Search by Dealer Name, Contact, or GSTIN..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
             />
           </div>
@@ -73,28 +109,29 @@ export default function DealersPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : dealers.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                         <Building2 size={24} className="text-primary" />
                       </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">No dealers found</h3>
-                      <p className="text-gray-500 mb-6 max-w-sm">
-                        Get started by adding your first supplier to the directory.
-                      </p>
-                      <Link
-                        href="/dashboard/dealers/new"
-                        className="px-6 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm"
-                      >
-                        Add Dealer
-                      </Link>
+                      <h3 className="text-lg font-medium text-gray-900 mb-1">
+                        {search ? "No dealers match your search." : "No dealers found"}
+                      </h3>
+                      {!search && (
+                        <>
+                          <p className="text-gray-500 mb-6 max-w-sm">Get started by adding your first supplier.</p>
+                          <Link href="/dashboard/dealers/new" className="px-6 py-2 bg-primary text-white rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
+                            Add Dealer
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
               ) : (
-                dealers.map((dealer: any) => (
+                filtered.map((dealer: any) => (
                   <tr key={dealer._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -115,7 +152,22 @@ export default function DealersPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-primary hover:text-blue-800 text-sm font-medium mr-3">Edit</button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/dashboard/dealers/${dealer._id.toString()}/edit`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Pencil size={13} /> Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(dealer._id.toString(), dealer.dealerName)}
+                          disabled={deletingId === dealer._id.toString()}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={13} />
+                          {deletingId === dealer._id.toString() ? "..." : "Delete"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

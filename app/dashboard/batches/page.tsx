@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Search, Filter } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 function SkeletonRow() {
@@ -19,13 +19,46 @@ function SkeletonRow() {
 export default function BatchesPage() {
   const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetch("/api/batches")
-      .then((r) => r.json())
-      .then((data) => { setBatches(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetchBatches = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/batches");
+      const data = await res.json();
+      setBatches(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchBatches(); }, [fetchBatches]);
+
+  const handleDelete = async (id: string, batchId: string) => {
+    if (!confirm(`Delete batch "${batchId}"? It will be marked inactive and hidden from all views.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/batches/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setBatches((prev) => prev.filter((b) => b._id.toString() !== id));
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete: ${err.error}`);
+      }
+    } catch {
+      alert("Error deleting batch");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const filtered = batches.filter((b) =>
+    b.batchId?.toLowerCase().includes(search.toLowerCase()) ||
+    b.productId?.productName?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -44,21 +77,19 @@ export default function BatchesPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-100">
+          <div className="relative max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={18} className="text-gray-400" />
             </div>
             <input
               type="text"
               placeholder="Search by Batch ID or Product Name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
             />
           </div>
-          <button className="flex items-center gap-2 px-3 py-2 text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
-            <Filter size={18} />
-            <span className="text-sm font-medium">Filters</span>
-          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -79,14 +110,14 @@ export default function BatchesPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : batches.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No batches found. Click &quot;Receive Stock&quot; to add a batch.
+                    {search ? "No batches match your search." : "No batches found. Click \"Receive Stock\" to add a batch."}
                   </td>
                 </tr>
               ) : (
-                batches.map((batch: any) => {
+                filtered.map((batch: any) => {
                   const expiryDate = new Date(batch.expiryDate);
                   const isExpired = expiryDate < new Date();
                   const isExpiringSoon = !isExpired && (expiryDate.getTime() - new Date().getTime()) < 30 * 24 * 60 * 60 * 1000;
@@ -123,8 +154,28 @@ export default function BatchesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link href={`/dashboard/batches/${batch._id.toString()}`} className="text-primary hover:text-blue-800 text-sm font-medium mr-3">View</Link>
-                        <Link href={`/dashboard/batches/${batch._id.toString()}/adjust`} className="text-gray-500 hover:text-gray-700 text-sm font-medium">Adjust</Link>
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/dashboard/batches/${batch._id.toString()}`}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            View
+                          </Link>
+                          <Link
+                            href={`/dashboard/batches/${batch._id.toString()}/edit`}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Pencil size={13} /> Edit
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(batch._id.toString(), batch.batchId)}
+                            disabled={deletingId === batch._id.toString()}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 size={13} />
+                            {deletingId === batch._id.toString() ? "..." : "Delete"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

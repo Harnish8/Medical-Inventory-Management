@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Search, Filter } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 function SkeletonRow() {
@@ -19,13 +19,46 @@ function SkeletonRow() {
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((data) => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/products");
+      const data = await res.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This will mark it as inactive and hide it from all views.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setProducts((prev) => prev.filter((p) => p._id.toString() !== id));
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete: ${err.error}`);
+      }
+    } catch {
+      alert("Error deleting product");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const filtered = products.filter((p) =>
+    p.productName?.toLowerCase().includes(search.toLowerCase()) ||
+    p.productId?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -44,21 +77,19 @@ export default function ProductsPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-100">
+          <div className="relative max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={18} className="text-gray-400" />
             </div>
             <input
               type="text"
               placeholder="Search products by name or ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
             />
           </div>
-          <button className="flex items-center gap-2 px-3 py-2 text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
-            <Filter size={18} />
-            <span className="text-sm font-medium">Filters</span>
-          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -78,14 +109,14 @@ export default function ProductsPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : products.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No products found. Click &quot;Add Product&quot; to create one.
+                    {search ? "No products match your search." : "No products found. Click \"Add Product\" to create one."}
                   </td>
                 </tr>
               ) : (
-                products.map((product: any) => (
+                filtered.map((product: any) => (
                   <tr key={product._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
@@ -103,7 +134,7 @@ export default function ProductsPage() {
                       <p className="text-xs text-gray-500 mt-1">Unit: {product.unitType}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {product.categoryId?.categoryName || "Unknown"}
+                      {product.categoryId?.categoryName || "General"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {product.minStockLevel} units
@@ -116,8 +147,22 @@ export default function ProductsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link href={`/dashboard/products/${product._id.toString()}/edit`} className="text-primary hover:text-blue-800 text-sm font-medium mr-3">Edit</Link>
-                      <button className="text-gray-500 hover:text-gray-700 text-sm font-medium">Batches</button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/dashboard/products/${product._id.toString()}/edit`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Pencil size={13} /> Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(product._id.toString(), product.productName)}
+                          disabled={deletingId === product._id.toString()}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={13} />
+                          {deletingId === product._id.toString() ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

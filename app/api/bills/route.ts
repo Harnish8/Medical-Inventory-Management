@@ -8,20 +8,42 @@ import { Batch } from "@/models/Batch";
 import { Product } from "@/models/Product";
 import { InventoryMovement } from "@/models/InventoryMovement";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const limitParam = searchParams.get("limit");
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+
+    const limit = limitParam ? parseInt(limitParam) : 5;
+
     await dbConnect();
-    const bills = await CustomerBill.aggregate([
+
+    const matchStage: any = {};
+    if (fromParam || toParam) {
+      matchStage.createdAt = {};
+      if (fromParam) matchStage.createdAt.$gte = new Date(fromParam);
+      if (toParam) {
+        const toDate = new Date(toParam);
+        toDate.setHours(23, 59, 59, 999);
+        matchStage.createdAt.$lte = toDate;
+      }
+    }
+
+    const pipeline: any[] = [
+      ...(Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : []),
       { $sort: { createdAt: -1 } },
-      { $limit: 50 },
+      { $limit: limit },
       { $addFields: { itemCount: { $size: { $ifNull: ["$items", []] } } } },
       { $project: { items: 0 } },
-    ]);
+    ];
+
+    const bills = await CustomerBill.aggregate(pipeline);
 
     const response = NextResponse.json(bills, { status: 200 });
     response.headers.set("Cache-Control", "no-store");

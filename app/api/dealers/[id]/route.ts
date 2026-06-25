@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import { revalidateTag } from "next/cache";
-import { Batch } from "@/models/Batch";
-import { Product } from "@/models/Product";
 import { Dealer } from "@/models/Dealer";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -15,15 +13,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
 
     await dbConnect();
-    const batch = await Batch.findById(params.id)
-      .populate({ path: 'productId', model: Product })
-      .populate({ path: 'dealerId', model: Dealer });
-      
-    if (!batch) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+    const dealer = await Dealer.findById(params.id).lean();
+
+    if (!dealer) {
+      return NextResponse.json({ error: "Dealer not found" }, { status: 404 });
     }
-    
-    const response = NextResponse.json(batch, { status: 200 });
+
+    const response = NextResponse.json(dealer, { status: 200 });
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
@@ -41,30 +37,23 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const body = await req.json();
     await dbConnect();
 
-    // Prevent changing protected fields
     delete body._id;
-    delete body.batchId;
-    delete body.productId;
-    delete body.quantityReceived;
 
-    const updatedBatch = await Batch.findByIdAndUpdate(
+    const updatedDealer = await Dealer.findByIdAndUpdate(
       params.id,
       { $set: body },
       { new: true, runValidators: true }
     );
 
-    if (!updatedBatch) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+    if (!updatedDealer) {
+      return NextResponse.json({ error: "Dealer not found" }, { status: 404 });
     }
 
-    revalidateTag("batches");
-    revalidateTag("inventory");
-    revalidateTag("dashboard-stats");
-    revalidateTag("alerts");
+    revalidateTag("dealers");
 
-    return NextResponse.json({ message: "Batch updated successfully", batch: updatedBatch }, { status: 200 });
+    return NextResponse.json({ message: "Dealer updated successfully", dealer: updatedDealer }, { status: 200 });
   } catch (error: any) {
-    console.error("Batch Update Error:", error);
+    console.error("Dealer Update Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -77,24 +66,21 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     await dbConnect();
-    const deleted = await Batch.findByIdAndUpdate(
+    const deleted = await Dealer.findByIdAndUpdate(
       params.id,
       { $set: { status: "Inactive" } },
       { new: true }
     );
 
     if (!deleted) {
-      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+      return NextResponse.json({ error: "Dealer not found" }, { status: 404 });
     }
 
-    revalidateTag("batches");
-    revalidateTag("inventory");
-    revalidateTag("dashboard-stats");
-    revalidateTag("alerts");
+    revalidateTag("dealers");
 
-    return NextResponse.json({ message: "Batch deleted successfully" }, { status: 200 });
+    return NextResponse.json({ message: "Dealer deleted successfully" }, { status: 200 });
   } catch (error: any) {
-    console.error("Batch Delete Error:", error);
+    console.error("Dealer Delete Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
