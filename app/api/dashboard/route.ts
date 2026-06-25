@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { withCache } from "@/lib/cache";
+import dbConnect from "@/lib/mongodb";
 import { Product } from "@/models/Product";
 import { Batch } from "@/models/Batch";
 import { CustomerBill } from "@/models/CustomerBill";
 
-// Dashboard stats — cached 60s (today's sales is accurate enough at 1-min granularity)
-const fetchDashboardStats = withCache(
-  "dashboard-stats",
-  async () => {
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await dbConnect();
+
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -61,7 +66,7 @@ const fetchDashboardStats = withCache(
       else if (stock <= product.minStockLevel) lowStockCount++;
     }
 
-    return {
+    const stats = {
       totalProducts,
       totalBatches,
       totalValue,
@@ -71,25 +76,13 @@ const fetchDashboardStats = withCache(
       expiringBatches,
       expiredBatches,
     };
-  },
-  60 // 60 second TTL
-);
-
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const stats = await fetchDashboardStats();
 
     const response = NextResponse.json({
       ...stats,
       role: session.user?.role,
       userName: session.user?.name,
     });
-    response.headers.set("Cache-Control", "private, max-age=60, stale-while-revalidate=120");
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

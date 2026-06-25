@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
-import { withCache } from "@/lib/cache";
+import { revalidateTag } from "next/cache";
 import { Dealer } from "@/models/Dealer";
 
 export async function POST(req: Request) {
@@ -29,18 +29,15 @@ export async function POST(req: Request) {
       paymentTerms: body.paymentTerms,
     });
 
+    // Bust dealer cache so the list updates immediately
+    revalidateTag("dealers");
+
     return NextResponse.json({ message: "Dealer created successfully", dealer: newDealer }, { status: 201 });
   } catch (error: any) {
     console.error("Dealer Creation Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-const fetchDealers = withCache(
-  "dealers",
-  () => Dealer.find({ status: "Active" }).sort({ createdAt: -1 }).lean(),
-  30
-);
 
 export async function GET() {
   try {
@@ -49,9 +46,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const dealers = await fetchDealers();
+    await dbConnect();
+    const dealers = await Dealer.find({ status: "Active" }).sort({ createdAt: -1 }).lean();
+
     const response = NextResponse.json(dealers, { status: 200 });
-    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -2,23 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
-import { withCache } from "@/lib/cache";
+import { revalidateTag } from "next/cache";
 import { CustomerBill } from "@/models/CustomerBill";
 import { Batch } from "@/models/Batch";
 import { Product } from "@/models/Product";
 import { InventoryMovement } from "@/models/InventoryMovement";
-
-const fetchBills = withCache(
-  "bills",
-  () =>
-    CustomerBill.aggregate([
-      { $sort: { createdAt: -1 } },
-      { $limit: 50 },
-      { $addFields: { itemCount: { $size: { $ifNull: ["$items", []] } } } },
-      { $project: { items: 0 } },
-    ]),
-  30
-);
 
 export async function GET() {
   try {
@@ -26,9 +14,17 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const bills = await fetchBills();
+
+    await dbConnect();
+    const bills = await CustomerBill.aggregate([
+      { $sort: { createdAt: -1 } },
+      { $limit: 50 },
+      { $addFields: { itemCount: { $size: { $ifNull: ["$items", []] } } } },
+      { $project: { items: 0 } },
+    ]);
+
     const response = NextResponse.json(bills, { status: 200 });
-    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -145,6 +141,13 @@ export async function POST(req: Request) {
       generatedByUserId: (session.user as any).id,
       items: processedItems
     });
+
+    // Bust all caches — billing affects stock, inventory, dashboard, and alerts
+    revalidateTag("bills");
+    revalidateTag("batches");
+    revalidateTag("inventory");
+    revalidateTag("dashboard-stats");
+    revalidateTag("alerts");
 
     return NextResponse.json({ message: "Bill generated successfully", billId }, { status: 201 });
 

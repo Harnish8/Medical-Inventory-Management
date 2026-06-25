@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
-import { withCache } from "@/lib/cache";
+import { revalidateTag } from "next/cache";
 import { Product } from "@/models/Product";
 import { ProductCategory } from "@/models/ProductCategory";
 
@@ -35,18 +35,18 @@ export async function POST(req: Request) {
       categoryId: body.categoryId === "temp_id" || !body.categoryId ? category._id : body.categoryId,
     });
 
+    // Bust caches so products list and inventory update immediately
+    revalidateTag("products");
+    revalidateTag("inventory");
+    revalidateTag("dashboard-stats");
+    revalidateTag("alerts");
+
     return NextResponse.json({ message: "Product created successfully", product: newProduct }, { status: 201 });
   } catch (error: any) {
     console.error("Product Creation Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-const fetchProducts = withCache(
-  "products",
-  () => Product.find({ status: "Active" }).lean(),
-  30
-);
 
 export async function GET() {
   try {
@@ -55,9 +55,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const products = await fetchProducts();
+    await dbConnect();
+    const products = await Product.find({ status: "Active" }).lean();
+
     const response = NextResponse.json(products, { status: 200 });
-    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

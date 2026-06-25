@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { withCache } from "@/lib/cache";
+import dbConnect from "@/lib/mongodb";
 import { Product } from "@/models/Product";
 import { Batch } from "@/models/Batch";
 
@@ -11,10 +11,15 @@ const thirtyDaysFromNow = () => {
   return d;
 };
 
-// Cached alerts — 30s TTL
-const fetchAlerts = withCache(
-  "alerts",
-  async () => {
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await dbConnect();
+
     const [lowStockData, expiryAlerts] = await Promise.all([
       Product.aggregate([
         { $match: { status: "Active" } },
@@ -50,28 +55,16 @@ const fetchAlerts = withCache(
     ]);
 
     const now = new Date();
-    return {
+    const data = {
       lowStockAlerts: lowStockData,
       expiryAlerts: expiryAlerts.map((b: any) => ({
         ...b,
         isExpired: new Date(b.expiryDate) < now,
       })),
     };
-  },
-  30
-);
-
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const data = await fetchAlerts();
 
     const response = NextResponse.json(data, { status: 200 });
-    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

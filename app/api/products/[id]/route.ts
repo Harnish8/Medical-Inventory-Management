@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
+import { revalidateTag } from "next/cache";
 import { Product } from "@/models/Product";
 import { ProductCategory } from "@/models/ProductCategory";
 
@@ -22,7 +23,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
     
-    return NextResponse.json(product, { status: 200 });
+    const response = NextResponse.json(product, { status: 200 });
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -51,6 +54,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (!updatedProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    // Bust caches so updated product details show everywhere immediately
+    revalidateTag("products");
+    revalidateTag("inventory");
+    revalidateTag("dashboard-stats");
+    revalidateTag("alerts");
 
     return NextResponse.json({ message: "Product updated successfully", product: updatedProduct }, { status: 200 });
   } catch (error: any) {
