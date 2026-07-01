@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, FileText, Trash2, Calendar, ChevronDown } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Calendar } from "lucide-react";
 import Link from "next/link";
+import Pagination from "@/components/Pagination";
 
-type FilterPreset = "today" | "10days" | "1month" | "6months" | "1year" | "custom" | "last5";
+type FilterPreset = "last10" | "today" | "10days" | "1month" | "6months" | "1year" | "custom";
 
 function SkeletonRow() {
   return (
@@ -29,23 +30,23 @@ function getDateRange(preset: FilterPreset): { from: string; to: string } | null
   };
 
   switch (preset) {
-    case "today":      return { from: toStr, to: toStr };
-    case "10days":     return { from: daysAgo(10), to: toStr };
-    case "1month":     return { from: daysAgo(30), to: toStr };
-    case "6months":    return { from: daysAgo(180), to: toStr };
-    case "1year":      return { from: daysAgo(365), to: toStr };
-    default:           return null;
+    case "today":    return { from: toStr, to: toStr };
+    case "10days":   return { from: daysAgo(10), to: toStr };
+    case "1month":   return { from: daysAgo(30), to: toStr };
+    case "6months":  return { from: daysAgo(180), to: toStr };
+    case "1year":    return { from: daysAgo(365), to: toStr };
+    default:         return null;
   }
 }
 
 const PRESET_LABELS: Record<FilterPreset, string> = {
-  last5: "Last 5 Bills",
-  today: "Today",
+  last10:   "Last 10 Bills",
+  today:    "Today",
   "10days": "10 Days",
   "1month": "1 Month",
-  "6months": "6 Months",
-  "1year": "1 Year",
-  custom: "Custom",
+  "6months":"6 Months",
+  "1year":  "1 Year",
+  custom:   "Custom",
 };
 
 export default function BillingPage() {
@@ -53,17 +54,19 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activePreset, setActivePreset] = useState<FilterPreset>("last5");
+  const [activePreset, setActivePreset] = useState<FilterPreset>("last10");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchBills = useCallback(async (preset: FilterPreset, cFrom?: string, cTo?: string) => {
     setLoading(true);
     try {
       let url = "/api/bills";
-      if (preset === "last5") {
-        url = "/api/bills?limit=5";
+      if (preset === "last10") {
+        url = "/api/bills?limit=10";
       } else if (preset === "custom") {
         const from = cFrom || customFrom;
         const to = cTo || customTo;
@@ -83,7 +86,10 @@ export default function BillingPage() {
     }
   }, [customFrom, customTo]);
 
-  useEffect(() => { fetchBills("last5"); }, []);
+  useEffect(() => { fetchBills("last10"); }, []);
+
+  // Reset to page 1 on filter or search change
+  useEffect(() => { setCurrentPage(1); }, [search, activePreset]);
 
   const handlePreset = (preset: FilterPreset) => {
     setActivePreset(preset);
@@ -96,6 +102,7 @@ export default function BillingPage() {
   const handleCustomApply = () => {
     if (!customFrom || !customTo) { alert("Please select both From and To dates."); return; }
     fetchBills("custom", customFrom, customTo);
+    setCurrentPage(1);
   };
 
   const handleDelete = async (id: string, billId: string) => {
@@ -121,7 +128,9 @@ export default function BillingPage() {
     b.customerName?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const presets: FilterPreset[] = ["last5", "today", "10days", "1month", "6months", "1year", "custom"];
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const presets: FilterPreset[] = ["last10", "today", "10days", "1month", "6months", "1year", "custom"];
 
   return (
     <div className="space-y-6">
@@ -229,7 +238,7 @@ export default function BillingPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : filtered.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
@@ -252,7 +261,7 @@ export default function BillingPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((bill: any) => (
+                paginated.map((bill: any) => (
                   <tr key={bill._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
@@ -303,11 +312,14 @@ export default function BillingPage() {
           </table>
         </div>
 
-        {!loading && bills.length > 0 && (
-          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
-            Showing {filtered.length} of {bills.length} bills for {PRESET_LABELS[activePreset]}
-            {activePreset === "last5" && " — use a date filter to see more"}
-          </div>
+        {!loading && (
+          <Pagination
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import Pagination from "@/components/Pagination";
 
 function SkeletonRow() {
   return (
@@ -21,6 +22,8 @@ export default function BatchesPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchBatches = useCallback(async () => {
     setLoading(true);
@@ -36,6 +39,9 @@ export default function BatchesPage() {
   }, []);
 
   useEffect(() => { fetchBatches(); }, [fetchBatches]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setCurrentPage(1); }, [search]);
 
   const handleDelete = async (id: string, batchId: string) => {
     if (!confirm(`Delete batch "${batchId}"? It will be marked inactive and hidden from all views.`)) return;
@@ -59,6 +65,8 @@ export default function BatchesPage() {
     b.batchId?.toLowerCase().includes(search.toLowerCase()) ||
     b.productId?.productName?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -110,14 +118,14 @@ export default function BatchesPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : filtered.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     {search ? "No batches match your search." : "No batches found. Click \"Receive Stock\" to add a batch."}
                   </td>
                 </tr>
               ) : (
-                filtered.map((batch: any) => {
+                paginated.map((batch: any) => {
                   const expiryDate = new Date(batch.expiryDate);
                   const isExpired = expiryDate < new Date();
                   const isExpiringSoon = !isExpired && (expiryDate.getTime() - new Date().getTime()) < 30 * 24 * 60 * 60 * 1000;
@@ -184,6 +192,16 @@ export default function BatchesPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        )}
       </div>
     </div>
   );

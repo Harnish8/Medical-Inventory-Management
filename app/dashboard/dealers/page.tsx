@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Building2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import Pagination from "@/components/Pagination";
 
 function SkeletonRow() {
   return (
@@ -21,6 +22,8 @@ export default function DealersPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchDealers = useCallback(async () => {
     setLoading(true);
@@ -36,6 +39,9 @@ export default function DealersPage() {
   }, []);
 
   useEffect(() => { fetchDealers(); }, [fetchDealers]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setCurrentPage(1); }, [search]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete dealer "${name}"? They will be marked inactive.`)) return;
@@ -60,6 +66,8 @@ export default function DealersPage() {
     d.contactPerson?.toLowerCase().includes(search.toLowerCase()) ||
     d.gstin?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -109,7 +117,7 @@ export default function DealersPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : filtered.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
@@ -131,7 +139,7 @@ export default function DealersPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((dealer: any) => (
+                paginated.map((dealer: any) => (
                   <tr key={dealer._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -175,6 +183,16 @@ export default function DealersPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        )}
       </div>
     </div>
   );

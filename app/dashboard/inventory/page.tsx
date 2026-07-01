@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Search, AlertTriangle, PackageSearch } from "lucide-react";
+import Pagination from "@/components/Pagination";
 
 function SkeletonRow() {
   return (
@@ -18,6 +19,9 @@ function SkeletonRow() {
 export default function InventoryPage() {
   const [inventoryData, setInventoryData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     fetch("/api/inventory")
@@ -25,6 +29,16 @@ export default function InventoryPage() {
       .then((data) => { setInventoryData(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setCurrentPage(1); }, [search]);
+
+  const filtered = inventoryData.filter((item) =>
+    item.productName?.toLowerCase().includes(search.toLowerCase()) ||
+    item.unitType?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -43,7 +57,9 @@ export default function InventoryPage() {
             </div>
             <input
               type="text"
-              placeholder="Search inventory..."
+              placeholder="Search inventory by product name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 text-sm"
             />
           </div>
@@ -66,22 +82,26 @@ export default function InventoryPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : inventoryData.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                         <PackageSearch size={24} className="text-primary" />
                       </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">No products found</h3>
-                      <p className="text-gray-500 mb-6 max-w-sm">
-                        Create products in the catalog to start tracking inventory.
-                      </p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-1">
+                        {search ? "No products match your search." : "No products found"}
+                      </h3>
+                      {!search && (
+                        <p className="text-gray-500 mb-6 max-w-sm">
+                          Create products in the catalog to start tracking inventory.
+                        </p>
+                      )}
                     </div>
                   </td>
                 </tr>
               ) : (
-                inventoryData.map((item: any) => (
+                paginated.map((item: any) => (
                   <tr key={item._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{item.productName}</p>
@@ -119,6 +139,16 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        )}
       </div>
     </div>
   );

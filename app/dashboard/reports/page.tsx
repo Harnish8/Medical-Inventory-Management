@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TrendingUp, BarChart3, ArrowUpRight, ArrowDownRight, IndianRupee } from "lucide-react";
+import Pagination from "@/components/Pagination";
 
 function SkeletonCard() {
   return (
@@ -28,6 +29,8 @@ function SkeletonRow() {
 export default function ReportsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     fetch("/api/reports")
@@ -40,6 +43,9 @@ export default function ReportsPage() {
     data?.lastMonthSales === 0
       ? 100
       : ((data?.thisMonthSales - data?.lastMonthSales) / data?.lastMonthSales) * 100;
+
+  const allMovements: any[] = data?.recentMovements ?? [];
+  const paginatedMovements = allMovements.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -105,8 +111,13 @@ export default function ReportsPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Recent Inventory Movements</h2>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Inventory Movements</h2>
+          {!loading && allMovements.length > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{allMovements.length} total movements</p>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -121,12 +132,12 @@ export default function ReportsPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-              ) : !data?.recentMovements?.length ? (
+              ) : !paginatedMovements.length ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No recent movements</td>
                 </tr>
               ) : (
-                data.recentMovements.map((mov: any) => (
+                paginatedMovements.map((mov: any) => (
                   <tr key={mov._id.toString()} className="text-sm">
                     <td className="px-6 py-4 text-gray-600">{new Date(mov.createdAt).toLocaleString()}</td>
                     <td className="px-6 py-4 font-medium text-gray-900">{(mov.productId as any)?.productName || "Unknown"}</td>
@@ -143,6 +154,16 @@ export default function ReportsPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            totalItems={allMovements.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        )}
       </div>
     </div>
   );

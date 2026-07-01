@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import Pagination from "@/components/Pagination";
 
 function SkeletonRow() {
   return (
@@ -21,6 +22,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -36,6 +39,9 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setCurrentPage(1); }, [search]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This will mark it as inactive and hide it from all views.`)) return;
@@ -59,6 +65,9 @@ export default function ProductsPage() {
     p.productName?.toLowerCase().includes(search.toLowerCase()) ||
     p.productId?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -109,14 +118,14 @@ export default function ProductsPage() {
                 <>
                   <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </>
-              ) : filtered.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     {search ? "No products match your search." : "No products found. Click \"Add Product\" to create one."}
                   </td>
                 </tr>
               ) : (
-                filtered.map((product: any) => (
+                paginated.map((product: any) => (
                   <tr key={product._id.toString()} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
@@ -170,6 +179,16 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && (
+          <Pagination
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          />
+        )}
       </div>
     </div>
   );
